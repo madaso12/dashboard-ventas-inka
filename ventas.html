@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análisis de Ventas - INKA / Aconcagua Expediciones</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F8F7F4;
+            color: #2c3e50;
+        }
+        .accent-color { color: #B85042; }
+        .accent-bg { background-color: #B85042; }
+        .secondary-color { color: #5A7D7C; }
+        .secondary-bg { background-color: #5A7D7C; }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+    </style>
+</head>
+<body class="flex flex-col md:flex-row">
+
+    <main class="flex-1 p-6 md:p-10">
+        
+        <section id="dashboard" class="mb-16 scroll-mt-24">
+            <h2 class="text-3xl font-bold mb-8 accent-color">Análisis Resumen de Ventas</h2>
+            <p class="text-lg text-gray-600 mb-8">Esta sección ofrece un resumen rápido del total de ventas y su distribución por categoría, utilizando la nueva fórmula de cálculo de ingresos.</p>
+
+            <div class="grid md:grid-cols-2 gap-6 mb-8">
+                <div class="bg-white p-6 rounded-xl shadow-md text-center">
+                    <h3 class="font-bold text-xl mb-2 secondary-color">Total Ventas USD</h3>
+                    <p id="totalSalesUSD" class="text-4xl font-extrabold accent-color">$ 0</p>
+                </div>
+            </div>
+
+            <div class="grid md:grid-cols-1 gap-6">
+                <div class="bg-white p-6 rounded-xl shadow-lg">
+                    <h3 class="text-xl font-bold mb-4 secondary-color">Distribución de Ventas por Categoría</h3>
+                    <div class="chart-container">
+                        <canvas id="salesByCategoryChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // URL de tu Google Sheet publicado
+        const GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQPdUXLIvw7kaEk2kO9WCryK0Ar3LYbmEA7-jepL4Dp6LB9KOqDBywAb8tmS91iCgPYxdw7AR4Mmw4K/pub/gviz/tq?tqx=out:json&tq&gid=1907912960'; 
+
+        // ASUNCIONES DE COLUMNAS (¡BASADAS EN TU LISTADO DE 39 ENCABEZADOS!)
+        const COL_CATEGORIA = 2; 
+        
+        // Columnas para calcular el Monto Total de Venta (Monto USD)
+        const COLS_MONTO_VENTA = [
+            32, // PrecioCtaCte
+            33, // Servicio_Adicional_Of
+            34, // Servicio_Adicional_PM
+            35, // Servicio_Adicional_PA
+            36, // Servicio_Adicional_CF
+            37, // Permiso
+            38  // Comision
+        ];
+
+        let allSalesData = []; // To store all processed data from Google Sheet
+        let salesByCategoryChart; // For main dashboard
+
+        // Function to fetch data from Google Sheet
+        async function fetchSalesData() {
+            try {
+                const response = await fetch(GOOGLE_SHEET_URL);
+                const text = await response.text();
+                // Google Sheets API returns JSON with a specific wrapper
+                const jsonText = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
+                const data = JSON.parse(jsonText);
+                
+                const rows = data.table.rows;
+                
+                allSalesData = rows.map(row => {
+                    let totalMontoUSD = 0;
+                    COLS_MONTO_VENTA.forEach(colIndex => {
+                        // Accede al valor 'v' y asegúrate de que sea un número, si no, es 0
+                        totalMontoUSD += (row.c[colIndex] && typeof row.c[colIndex].v === 'number' ? row.c[colIndex].v : 0);
+                    });
+
+                    const categoria = row.c[COL_CATEGORIA] && row.c[COL_CATEGORIA].v ? String(row.c[COL_CATEGORIA].v) : 'N/A';
+                    
+                    return { 
+                        categoria, 
+                        montoUSD: totalMontoUSD 
+                    };
+                }).filter(item => item.montoUSD > 0); // Solo incluir ventas válidas
+                
+                updateSalesDashboard(); // Initial update after data fetch
+            } catch (error) {
+                console.error('Error fetching data from Google Sheet:', error);
+                document.getElementById('totalSalesUSD').textContent = '$ Error';
+                if (salesByCategoryChart) salesByCategoryChart.destroy();
+            }
+        }
+
+        // Helper to generate colors for charts
+        function generateColors(count) {
+            const colors = [
+                '#5A7D7C', '#B85042', '#8B9A6B', '#D48F50', '#6C7B90', '#F0C79A', '#7F675B', '#A5D6A7',
+                '#4CAF50', '#FFC107', '#2196F3', '#E91E63', '#9C27B0', '#00BCD4', '#FF9800', '#795548'
+            ];
+            return Array.from({ length: count }, (_, i) => colors[i % colors.length]);
+        }
+
+        // Function to update the Sales Dashboard elements
+        function updateSalesDashboard() {
+            // --- Sales Summary Dashboard ---
+            const totalSales = allSalesData.reduce((sum, item) => sum + item.montoUSD, 0);
+            document.getElementById('totalSalesUSD').textContent = `$ ${totalSales.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+
+            // Update Sales by Category Chart (Doughnut)
+            const categoryMap = {};
+            allSalesData.forEach(item => {
+                categoryMap[item.categoria] = (categoryMap[item.categoria] || 0) + item.montoUSD;
+            });
+            const categoryLabels = Object.keys(categoryMap);
+            const categoryData = Object.values(categoryMap);
+            const categoryColors = generateColors(categoryLabels.length);
+
+            if (salesByCategoryChart) {
+                salesByCategoryChart.data.labels = categoryLabels;
+                salesByCategoryChart.data.datasets[0].data = categoryData;
+                salesByCategoryChart.data.datasets[0].backgroundColor = categoryColors;
+                salesByCategoryChart.update();
+            } else {
+                const salesByCategoryCtx = document.getElementById('salesByCategoryChart').getContext('2d');
+                salesByCategoryChart = new Chart(salesByCategoryCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: categoryLabels,
+                        datasets: [{
+                            data: categoryData,
+                            backgroundColor: categoryColors,
+                            borderColor: '#F8F7F4', 
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: {
+                                    font: { size: 12 },
+                                    boxWidth: 20
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed !== null) {
+                                            const total = context.dataset.data.reduce((acc, val) => acc + val, 0);
+                                            const percentage = ((context.parsed / total) * 100).toFixed(1) + '%';
+                                            label += `$ ${context.parsed.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} (${percentage})`;
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // Initial data fetch and dashboard render
+        document.addEventListener('DOMContentLoaded', fetchSalesData);
+    </script>
+
+</body>
+</html>
