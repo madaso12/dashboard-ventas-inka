@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Análisis de Costos y Rentabilidad - INKA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #F8F7F4; color: #2c3e50; }
+        .accent-color { color: #B85042; }
+        .secondary-color { color: #5A7D7C; }
+        .sidebar-item.active { background-color: #B85042; color: white; }
+        .sidebar-item.active svg { color: white; }
+        .view { display: none; }
+        .view.active { display: block; }
+        .toggle-btn { cursor: pointer; font-size: 1.2em; transition: transform 0.3s ease-in-out; }
+        .toggle-btn.rotated { transform: rotate(90deg); }
+        .details-table-row { display: none; }
+        .details-table-row.visible { display: table-row; }
+        .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
+        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 700px; border-radius: 10px; position: relative; }
+        .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .close-btn:hover, .close-btn:focus { color: black; text-decoration: none; cursor: pointer; }
+        /* Toggle Switch */
+        .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #5A7D7C; }
+        input:checked + .slider:before { transform: translateX(26px); }
+        .currency-label { position: absolute; top: 8px; font-size: 12px; color: white; }
+        .usd-label { left: 8px; }
+        .ars-label { right: 8px; }
+
+        .sub-modal { display: none; position: fixed; z-index: 200; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); }
+        .sub-modal-content { background-color: #fefefe; margin: 10% auto; padding: 20px; border: 1px solid #888; width: 70%; max-width: 600px; border-radius: 10px; position: relative; }
+
+        .positive-profit { color: #22c55e; font-weight: bold; }
+        .negative-profit { color: #ef4444; font-weight: bold; }
+    </style>
+</head>
+<body class="flex flex-col md:flex-row min-h-screen">
+
+    <aside class="w-full md:w-64 bg-white shadow-lg p-4 md:p-6 sticky top-0 md:top-auto z-20">
+        <div class="text-center mb-8">
+            <h1 class="text-2xl font-bold secondary-color">INKA</h1>
+            <p class="text-sm text-gray-500">Dashboard de Costos</p>
+        </div>
+        <nav>
+            <ul class="space-y-2">
+                <li><a href="#vision_general" class="sidebar-item active flex items-center p-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors duration-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3 secondary-color" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" /></svg>
+                    Visión General
+                </a></li>
+                <li><a href="#desglose_ventas" class="sidebar-item flex items-center p-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors duration-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3 secondary-color" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01M12 12v4m0 4v.01M5 12H4m1 0h.01M19 12h-1m1 0h.01M12 5V4m0 1v.01M12 19v-1m0 1v.01" /></svg>
+                    Ventas y Costos
+                </a></li>
+                <li><a href="#matriz_datos" class="sidebar-item flex items-center p-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors duration-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3 secondary-color" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                    Matriz de Datos
+                </a></li>
+            </ul>
+        </nav>
+    </aside>
+
+    <main class="flex-1 p-6 md:p-10">
+        <header class="mb-6 pb-4 border-b border-gray-200">
+            <h1 class="text-4xl font-bold accent-color">Análisis de Costos por Productos de Venta</h1>
+        </header>
+        <div class="flex justify-end items-center mb-6">
+            <span class="mr-2 text-sm text-gray-600 font-medium">Moneda:</span>
+            <span class="mr-2 text-sm text-gray-600 font-medium" id="currentCurrencyLabel">ARS</span>
+            <label class="switch">
+                <input type="checkbox" id="currencyToggle">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <section id="vision_general" class="view active">
+            <h2 class="text-3xl font-bold mb-2 secondary-color">Visión General</h2>
+            <p class="text-lg text-gray-600 mb-6">Analiza la composición de costos de los productos de venta.</p>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                <div class="bg-white p-6 rounded-xl shadow-lg">
+                    <h3 class="text-2xl font-bold mb-4 secondary-color">Selección de Productos</h3>
+                    <div id="productSelection" class="space-y-2">
+                        </div>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-lg">
+                    <h3 class="text-2xl font-bold mb-4 secondary-color">Composición de Costos</h3>
+                    <div class="chart-container">
+                        <canvas id="costCompositionChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="desglose_ventas" class="view">
+            <h2 class="text-3xl font-bold mb-2 secondary-color">Desglose Detallado de Ventas y Costos</h2>
+            <p class="text-lg text-gray-600 mb-6">Haz clic en cada categoría para ver el desglose por producto.</p>
+            <div class="bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
+                <table class="w-full text-left table-auto">
+                    <thead>
+                        <tr class="bg-gray-50">
+                            <th class="p-4 font-semibold text-sm">Categoría</th>
+                            <th class="p-4 font-semibold text-sm">PAX</th>
+                            <th class="p-4 font-semibold text-sm">Costo Total</th>
+                            <th class="p-4 font-semibold text-sm">Facturación</th>
+                            <th class="p-4 font-semibold text-sm">Ganancia</th>
+                            <th class="p-4 font-semibold text-sm">% Margen Bruto</th>
+                            <th class="p-4 font-semibold text-sm"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="fullCostTable">
+                        </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="matriz_datos" class="view">
+            <h2 class="text-3xl font-bold mb-2 secondary-color">Matriz general de costos</h2>
+            <p class="text-lg text-gray-600 mb-6">Revisa y audita la base de datos de costos y rentabilidad de cada producto.</p>
+            <div class="bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
+                <table class="w-full text-left table-auto border-separate border-spacing-y-2" id="matrixTable">
+                    </table>
+            </div>
+        </section>
+
+        <div id="productModal" class="modal">
+            <div class="modal-content">
+                <span class="close-btn" onclick="closeModal()">&times;</span>
+                <h3 class="text-2xl font-bold mb-4 secondary-color" id="modalTitle"></h3>
+                <div id="modalContent">
+                    </div>
+            </div>
+        </div>
+
+        <div id="subModal" class="sub-modal">
+            <div class="sub-modal-content">
+                <span class="close-btn" onclick="closeSubModal()">&times;</span>
+                <h3 class="text-2xl font-bold mb-4 secondary-color" id="subModalTitle"></h3>
+                <div id="subModalContent"></div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const exchangeRate = 1200;
+        const totalPax = 1375;
+
+        // Nuevos valores corregidos
+        const totalFixedCosts = 806260592.19;
+        const totalArrieros = 34932500;
+        const totalPorters = 352579200;
+        const totalGuias = 537465600;
+        const totalHospedajeHoteles = 56475254;
+        const totalComidasHoteleria = 2346896;
+        const totalMerchandising = 4000000;
+        const totalFFT = 10254250;
+
+        // Data fija por producto y su prorrateo
+        const getProportionalCost = (totalCost) => totalCost / totalPax;
+        const fixedCostPerPax = getProportionalCost(totalFixedCosts);
+        const arrierosPerPax = getProportionalCost(totalArrieros);
+        const portersPerPax = getProportionalCost(totalPorters);
+        const guiasPerPax = getProportionalCost(totalGuias);
+        const hospedajeHotelesPerPax = getProportionalCost(totalHospedajeHoteles);
+        const comidasHoteleriaPerPax = getProportionalCost(totalComidasHoteleria);
+        const merchandisingPerPax = getProportionalCost(totalMerchandising);
+        const fftPerPax = getProportionalCost(totalFFT);
+
+        const categoriesData = {
+            'Cabalgata': { pax: 33, products: { 'AUCB': { pax: 26 }, 'AUCBGP': { pax: 7 } } },
+            'Expedición': { pax: 1108, products: { 'GON': { pax: 470 }, 'GOT': { pax: 44 }, 'GPN': { pax: 153 }, 'GPT': { pax: 89 }, 'IKG': { pax: 1 }, 'IKN': { pax: 153 }, 'IKNEXT': { pax: 91 }, 'IKT': { pax: 95 }, 'KILI': { pax: 10 }, 'VLLGP': { pax: 2 } } },
+            'Servicio Suelto': { pax: 112, products: { 'SSCF': { pax: 6 }, 'SSN': { pax: 61 }, 'SSPF': { pax: 25 }, 'SSPM': { pax: 5 }, 'SST': { pax: 14 }, 'SSV': { pax: 1 } } },
+            'Trekking': { pax: 122, products: { 'AUTK': { pax: 44 }, 'AUTKGP': { pax: 5 }, 'CRU': { pax: 5 }, 'GOPM': { pax: 3 }, 'TKAT': { pax: 1 }, 'TKCB': { pax: 18 }, 'TKCB PRIV': { pax: 1 }, 'TKCF': { pax: 5 }, 'TKEV': { pax: 2 }, 'TKPF': { pax: 20 }, 'TKPM': { pax: 7 }, 'TKPM PRIV': { pax: 2 }, 'TKTILCAL': { pax: 9 } } }
+        };
+        
+        const allProductsData = {
+            'AUCB': { pax: 26, costos: { permisos: 8133369, comidas: 7060484, transfers: 2662717 } },
+            'AUCBGP': { pax: 7, costos: { permisos: 2189655, comidas: 1899982, transfers: 716257 } },
+            'GON': { pax: 470, costos: { permisos: 146920273, comidas: 127632730, transfers: 47989284 } },
+            'GOT': { pax: 44, costos: { permisos: 13755772, comidas: 11942268, transfers: 4498411 } },
+            'GPN': { pax: 153, costos: { permisos: 47801365, comidas: 41517070, transfers: 15617962 } },
+            'GPT': { pax: 89, costos: { permisos: 27818846, comidas: 24167587, transfers: 9088618 } },
+            'IKG': { pax: 1, costos: { permisos: 312822, comidas: 271557, transfers: 102412 } },
+            'IKN': { pax: 153, costos: { permisos: 47801365, comidas: 41517070, transfers: 15617962 } },
+            'IKNEXT': { pax: 91, costos: { permisos: 28530789, comidas: 24782796, transfers: 9319502 } },
+            'IKT': { pax: 95, costos: { permisos: 29805078, comidas: 25890923, transfers: 9729148 } },
+            'KILI': { pax: 10, costos: { permisos: 3128219, comidas: 2715571, transfers: 1024122 } },
+            'VLLGP': { pax: 2, costos: { permisos: 625644, comidas: 543114, transfers: 204824 } },
+            'SSCF': { pax: 6, costos: { permisos: 1876931, comidas: 1629343, transfers: 614473 } },
+            'SSN': { pax: 61, costos: { permisos: 19122994, comidas: 16610985, transfers: 6247149 } },
+            'SSPF': { pax: 25, costos: { permisos: 7820547, comidas: 6788927, transfers: 2560305 } },
+            'SSPM': { pax: 5, costos: { permisos: 1564109, comidas: 1357785, transfers: 512061 } },
+            'SST': { pax: 14, costos: { permisos: 4379497, comidas: 3801797, transfers: 1433771 } },
+            'SSV': { pax: 1, costos: { permisos: 312822, comidas: 271557, transfers: 102412 } },
+            'AUTK': { pax: 44, costos: { permisos: 13764496, comidas: 11950961, transfers: 4499691 } },
+            'AUTKGP': { pax: 5, costos: { permisos: 1564109, comidas: 1357785, transfers: 512061 } },
+            'CRU': { pax: 5, costos: { permisos: 1564109, comidas: 1357785, transfers: 512061 } },
+            'GOPM': { pax: 3, costos: { permisos: 938465, comidas: 814671, transfers: 307236 } },
+            'TKAT': { pax: 1, costos: { permisos: 312822, comidas: 271557, transfers: 102412 } },
+            'TKCB': { pax: 18, costos: { permisos: 5630794, comidas: 4888029, transfers: 1843419 } },
+            'TKCB PRIV': { pax: 1, costos: { permisos: 312822, comidas: 271557, transfers: 102412 } },
+            'TKCF': { pax: 5, costos: { permisos: 1564109, comidas: 1357785, transfers: 512061 } },
+            'TKEV': { pax: 2, costos: { permisos: 625644, comidas: 543114, transfers: 204824 } },
+            'TKPF': { pax: 20, costos: { permisos: 6256438, comidas: 5431140, transfers: 2048244 } },
+            'TKPM': { pax: 7, costos: { permisos: 2189753, comidas: 1899982, transfers: 716257 } },
+            'TKPM PRIV': { pax: 2, costos: { permisos: 625644, comidas: 543114, transfers: 204824 } },
+            'TKTILCAL': { pax: 9, costos: { permisos: 2815397, comidas: 2444015, transfers: 921709 } }
+        };
+
+        const revenues = {
+            'AUCB': 64700000,
+            'AUCBGP': 17400000,
+            'GON': 475000000,
+            'GOT': 44500000,
+            'GPN': 155000000,
+            'GPT': 91000000,
+            'IKG': 3200000,
+            'IKN': 156000000,
+            'IKNEXT': 92000000,
+            'IKT': 96000000,
+            'KILI': 10500000,
+            'VLLGP': 2100000,
+            'SSCF': 6300000,
+            'SSN': 62000000,
+            'SSPF': 26000000,
+            'SSPM': 5200000,
+            'SST': 14500000,
+            'SSV': 1000000,
+            'AUTK': 45000000,
+            'AUTKGP': 5500000,
+            'CRU': 5500000,
+            'GOPM': 3200000,
+            'TKAT': 1000000,
+            'TKCB': 18500000,
+            'TKCB PRIV': 1000000,
+            'TKCF': 5400000,
+            'TKEV': 2100000,
+            'TKPF': 20500000,
+            'TKPM': 7200000,
+            'TKPM PRIV': 2100000,
+            'TKTILCAL': 9200000
+        };
+
+        const categoriesColors = {
+            'Cabalgata': '#B85042',
+            'Expedición': '#5A7D7C',
+            'Servicio Suelto': '#FFB5A7',
+            'Trekking': '#A1A5A1'
+        };
+
+        let currentCurrency = 'ARS';
+        const productSelection = document.getElementById('productSelection');
+        const costCompositionChart = document.getElementById('costCompositionChart').getContext('2d');
+        const sidebarItems = document.querySelectorAll('.sidebar-item');
+        const views = document.querySelectorAll('.view');
+        const currencyToggle = document.getElementById('currencyToggle');
+        const currentCurrencyLabel = document.getElementById('currentCurrencyLabel');
+
+        const fixedCostsBreakdown = {
+            'Hospedaje personal staff penitentes': 2000000,
+            'Pedidos especiales mantenimiento campamentos': 116386875.75,
+            'Ferretería campamentos': 13192813.47,
+            'SUELDOS JERARQUICOS': 105400800,
+            'SUELDOS ADMINISTRACIÓN': 88041697.56,
+            'SUELDOS COMERCIAL': 92881123.74,
+            'SUELDOS DEPÓSITO': 44836114.38,
+            'ARRIERO': 24609612,
+            'JONATAN FABRIZIO': 12480000,
+            'F 931 ST/ALTURA SAS': 21600000,
+            'F 931 AESA': 21600000,
+            'SEGUROS PERSONAL (ACCIDENTES PERSONALES)': 360000,
+            'SINDICATO UTHGRA': 3523836,
+            'SINDICATO FAECYS': 3528096,
+            'SINDICATO CEC': 3600000,
+            'OSO HONORARIOS Y SISTEMA': 24202655.28,
+            'KEVIN CORIA - REDES SOCIALES': 13803000,
+            'IGNACIO TASSI - APOYO WEB': 5280000,
+            'LEOPOLDO SISTEMA': 4984800,
+            'ABOGADO LUIS BUTTERFIELD': 6000000,
+            'CONTADORES USA': 0,
+            'CONTADOR IMPUESTOS': 7695600,
+            'CONTADOR SUELDOS Y CONTABILIDAD': 14820000,
+            'IMPUESTOS Y SERVICIOS GRAL': 19950084,
+            'INTERNET OFICINAS (JBJ Y DEPO)': 4680000,
+            'MOVISTAR NO DESCONTADO': 2160000,
+            'PATENTES E INMOBILIARIO': 501084,
+            'SEGUROS PROPIOS': 3338400,
+            'ANTONIO LOPEZ': 0,
+            'SERVICIOS LIMPIEZA': 5760000,
+            'SERVICIO HIGIENE SEGURIDAD': 1680000,
+            'VARIOS DE CAJA (Provisiones)': 12000000,
+            'ALQUILER CAMPO': 1044000,
+            'MANTENIMIENTO MULAS FUERA TEMPORADA Y SANIDAD 2': 108000000,
+            'GESTIÓN DEL PERSONAL': 11520000,
+            'VIAJES AL CAMPO SEMANALES': 4800000,
+            'MERCHANDISING': 4000000,
+            'FFT': 10254250,
+        };
+
+        const costNames = {
+            'permisos': 'Permisos Parque',
+            'comidas': 'Comidas',
+            'transfers': 'Transfers',
+            'guias': 'Guías',
+            'arrieros': 'Arrieros (Int. y Clientes)',
+            'porters': 'Porters (Int. y Clientes)',
+            'fijosGenerales': 'Costos Fijos Generales',
+            'hospedajeHoteles': 'Hospedaje-Hoteles',
+            'comidasHoteleria': 'Comidas-Hoteleria'
+        };
+
+        const formatNumber = (num) => {
+            if (isNaN(num)) return 'N/A';
+            const formatted = new Intl.NumberFormat('es-AR', {
+                style: 'currency',
+                currency: currentCurrency,
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            }).format(num);
+            return formatted;
+        };
+        
+        const getProratedFixedCosts = (productCode) => {
+            const productPax = allProductsData[productCode].pax;
+            const proratedCosts = {};
+            for (const item in fixedCostsBreakdown) {
+                proratedCosts[item] = (fixedCostsBreakdown[item] / totalPax) * productPax;
+            }
+            return proratedCosts;
+        };
+
+        const updateAllProductsData = () => {
+            for (const productCode in allProductsData) {
+                const product = allProductsData[productCode];
+                product.costos.guias = guiasPerPax * product.pax;
+                product.costos.arrieros = arrierosPerPax * product.pax;
+                product.costos.porters = portersPerPax * product.pax;
+                product.costos.hospedajeHoteles = hospedajeHotelesPerPax * product.pax;
+                product.costos.comidasHoteleria = comidasHoteleriaPerPax * product.pax;
+                product.costos.fijosGenerales = fixedCostPerPax * product.pax;
+            }
+        };
+        updateAllProductsData();
+
+        const toggleVisibility = (id) => {
+            const row = document.getElementById(`details-${id}`);
+            const btn = document.getElementById(`toggle-btn-${id}`);
+            if (row) {
+                row.classList.toggle('visible');
+                btn.classList.toggle('rotated');
+            }
+        };
+
+        const openModal = (productCode) => {
+            const product = allProductsData[productCode];
+            const revenue = revenues[productCode];
+            const modalTitle = document.getElementById('modalTitle');
+            const modalContent = document.getElementById('modalContent');
+            const totalCost = Object.values(product.costos).reduce((sum, val) => sum + val, 0);
+
+            let costBreakdownHTML = `<h4 class="text-xl font-semibold mb-4 text-center">Desglose de Costos por Producto - ${productCode}</h4>`;
+            costBreakdownHTML += `<div class="bg-gray-50 p-4 rounded-lg mb-4 text-center">
+                                    <p class="font-bold">Facturación: ${formatNumber(revenue)}</p>
+                                    <p class="font-bold">Costo Total: ${formatNumber(totalCost)}</p>
+                                    <p class="font-bold">Ganancia: ${formatNumber(revenue - totalCost)}</p>
+                                    <p class="font-bold">% Margen Bruto: ${((revenue - totalCost) / revenue * 100).toFixed(2)}%</p>
+                                  </div>`;
+            costBreakdownHTML += `<table class="w-full text-left table-auto border-separate border-spacing-y-2">
+                                    <thead>
+                                        <tr class="bg-gray-100 rounded-md">
+                                            <th class="p-3">Concepto</th>
+                                            <th class="p-3 text-right">Monto</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>`;
+
+            for (const key in product.costos) {
+                const cost = product.costos[key];
+                const costName = costNames[key] || key;
+                
+                let rowHtml = `<tr class="bg-white shadow-sm rounded-md hover:bg-gray-50 transition-colors duration-200">
+                                    <td class="p-3 font-medium rounded-l-md">${costName}</td>
+                                    <td class="p-3 text-right rounded-r-md">${formatNumber(cost)}</td>
+                                  </tr>`;
+
+                if (key === 'fijosGenerales') {
+                    rowHtml = `<tr class="bg-white shadow-sm rounded-md hover:bg-gray-50 transition-colors duration-200 cursor-pointer" onclick="openSubModal('Desglose de Costos Fijos Generales', getProratedFixedCosts('${productCode}'))">
+                                    <td class="p-3 font-medium rounded-l-md">${costName}</td>
+                                    <td class="p-3 text-right rounded-r-md">${formatNumber(cost)}</td>
+                                  </tr>`;
+                }
+                
+                costBreakdownHTML += rowHtml;
+            }
+
+            costBreakdownHTML += `</tbody></table>`;
+            modalContent.innerHTML = costBreakdownHTML;
+            document.getElementById('productModal').style.display = 'block';
+        };
+
+        const closeModal = () => {
+            document.getElementById('productModal').style.display = 'none';
+        };
+
+        const openSubModal = (title, data) => {
+            const subModalTitle = document.getElementById('subModalTitle');
+            const subModalContent = document.getElementById('subModalContent');
+            subModalTitle.textContent = title;
+
+            let subModalHTML = `<table class="w-full text-left table-auto border-separate border-spacing-y-2">
+                                <thead>
+                                    <tr class="bg-gray-100 rounded-md">
+                                        <th class="p-3">Concepto</th>
+                                        <th class="p-3 text-right">Monto</th>
+                                    </tr>
+                                </thead>
+                                <tbody>`;
+            
+            for (const item in data) {
+                subModalHTML += `<tr class="bg-white shadow-sm rounded-md hover:bg-gray-50 transition-colors duration-200">
+                                    <td class="p-3 font-medium rounded-l-md">${item}</td>
+                                    <td class="p-3 text-right rounded-r-md">${formatNumber(data[item])}</td>
+                                </tr>`;
+            }
+            
+            subModalHTML += `</tbody></table>`;
+            subModalContent.innerHTML = subModalHTML;
+            document.getElementById('subModal').style.display = 'block';
+        };
+
+        const closeSubModal = () => {
+            document.getElementById('subModal').style.display = 'none';
+        };
+
+        const calculateCategoryTotals = (products) => {
+            let totalPax = 0;
+            let totalCost = 0;
+            let totalRevenue = 0;
+
+            for (const productCode in products) {
+                const product = allProductsData[productCode];
+                if (product) {
+                    const cost = Object.values(product.costos).reduce((sum, val) => sum + val, 0);
+                    const revenue = revenues[productCode];
+                    totalPax += product.pax;
+                    totalCost += cost;
+                    totalRevenue += revenue;
+                }
+            }
+            return { totalPax, totalCost, totalRevenue };
+        };
+
+        const getOverallData = () => {
+            const overallData = {
+                'Permisos Parque': 0,
+                'Comidas': 0,
+                'Transfers': 0,
+                'Guías': 0,
+                'Arrieros (Int. y Clientes)': 0,
+                'Porters (Int. y Clientes)': 0,
+                'Hospedaje-Hoteles': 0,
+                'Comidas-Hoteleria': 0,
+                'Costos Fijos Generales': 0
+            };
+
+            const selectedProducts = getSelectedProducts();
+            selectedProducts.forEach(productCode => {
+                const product = allProductsData[productCode];
+                if (product) {
+                    overallData['Permisos Parque'] += product.costos.permisos;
+                    overallData['Comidas'] += product.costos.comidas;
+                    overallData['Transfers'] += product.costos.transfers;
+                    overallData['Guías'] += product.costos.guias;
+                    overallData['Arrieros (Int. y Clientes)'] += product.costos.arrieros;
+                    overallData['Porters (Int. y Clientes)'] += product.costos.porters;
+                    overallData['Hospedaje-Hoteles'] += product.costos.hospedajeHoteles;
+                    overallData['Comidas-Hoteleria'] += product.costos.comidasHoteleria;
+                    overallData['Costos Fijos Generales'] += product.costos.fijosGenerales;
+                }
+            });
+
+            return overallData;
+        };
+
+        let myChart = null;
+
+        const updateChart = () => {
+            const data = getOverallData();
+            const labels = Object.keys(data);
+            const values = Object.values(data);
+            const colors = ['#B85042', '#5A7D7C', '#FFB5A7', '#A1A5A1', '#8C7A6D', '#7A918D', '#D9BF7C', '#B3B3B3', '#6A8A82'];
+            
+            if (myChart) {
+                myChart.data.labels = labels;
+                myChart.data.datasets[0].data = values;
+                myChart.data.datasets[0].backgroundColor = colors.slice(0, values.length);
+                myChart.update();
+            } else {
+                myChart = new Chart(costCompositionChart, {
+                    type: 'doughnut',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: values,
+                            backgroundColor: colors.slice(0, values.length),
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { position: 'right' },
+                            tooltip: { callbacks: { label: (context) => {
+                                const label = context.label || '';
+                                const value = context.parsed;
+                                return `${label}: ${formatNumber(value)}`;
+                            }}}
+                        }
+                    }
+                });
+            }
+        };
+
+        const getSelectedProducts = () => {
+            const checkboxes = document.querySelectorAll('#productSelection input[type="checkbox"]');
+            const selected = [];
+            checkboxes.forEach(checkbox => {
+                if (checkbox.checked) {
+                    selected.push(checkbox.value);
+                }
+            });
+            return selected;
+        };
+
+        const generateProductCheckboxes = () => {
+            productSelection.innerHTML = '';
+            const allProducts = Object.keys(allProductsData).sort();
+            allProducts.forEach(productCode => {
+                const product = allProductsData[productCode];
+                const checkboxContainer = document.createElement('div');
+                checkboxContainer.className = 'flex items-center space-x-2';
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `product-${productCode}`;
+                checkbox.value = productCode;
+                checkbox.checked = true;
+                checkbox.className = 'form-checkbox h-4 w-4 text-secondary-color rounded-sm transition-colors duration-200 focus:ring-secondary-color';
+                checkbox.addEventListener('change', updateChart);
+                const label = document.createElement('label');
+                label.htmlFor = `product-${productCode}`;
+                label.textContent = `${productCode} (${product.pax} PAX)`;
+                label.className = 'text-gray-700 font-medium cursor-pointer';
+                checkboxContainer.appendChild(checkbox);
+                checkboxContainer.appendChild(label);
+                productSelection.appendChild(checkboxContainer);
+            });
+            updateChart();
+        };
+
+        const generateCostTable = () => {
+            const tableBody = document.getElementById('fullCostTable');
+            tableBody.innerHTML = '';
+            
+            for (const category in categoriesData) {
+                const { totalPax, totalCost, totalRevenue } = calculateCategoryTotals(categoriesData[category].products);
+                const profit = totalRevenue - totalCost;
+                const margin = (profit / totalRevenue) * 100;
+
+                const row = document.createElement('tr');
+                row.className = 'bg-white shadow-lg rounded-lg border-b border-gray-100 hover:bg-gray-50 transition-colors duration-200';
+                row.innerHTML = `
+                    <td class="p-4 font-bold text-lg rounded-l-lg">${category}</td>
+                    <td class="p-4">${totalPax}</td>
+                    <td class="p-4">${formatNumber(totalCost)}</td>
+                    <td class="p-4">${formatNumber(totalRevenue)}</td>
+                    <td class="p-4">${formatNumber(profit)}</td>
+                    <td class="p-4">${margin.toFixed(2)}%</td>
+                    <td class="p-4 text-right rounded-r-lg">
+                        <span id="toggle-btn-${category}" onclick="toggleVisibility('${category}')" class="toggle-btn p-2 rounded-full hover:bg-gray-200 transition-colors duration-200">&#9656;</span>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+
+                const detailsRow = document.createElement('tr');
+                detailsRow.id = `details-${category}`;
+                detailsRow.className = 'details-table-row bg-gray-50';
+                let detailsHTML = `<td colspan="7" class="p-4">
+                                    <div class="p-4 border border-dashed border-gray-300 rounded-lg">
+                                        <h4 class="text-lg font-semibold mb-2">Productos en ${category}</h4>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">`;
+
+                for (const productCode in categoriesData[category].products) {
+                    const productData = allProductsData[productCode];
+                    const productRevenue = revenues[productCode];
+                    const productCost = Object.values(productData.costos).reduce((sum, val) => sum + val, 0);
+                    const productProfit = productRevenue - productCost;
+                    const productMargin = (productProfit / productRevenue) * 100;
+                    const costPerPax = productCost / productData.pax;
+
+                    detailsHTML += `
+                        <div onclick="openModal('${productCode}')" class="bg-white p-4 rounded-md shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer">
+                            <p class="font-semibold text-lg accent-color">${productCode}</p>
+                            <p class="text-sm text-gray-600">${productData.pax} PAX</p>
+                            <p class="text-sm text-gray-600">Costo/PAX: ${formatNumber(costPerPax)}</p>
+                            <p class="text-sm text-gray-600">Ganancia: ${formatNumber(productProfit)}</p>
+                            <p class="text-sm text-gray-600">Margen: ${productMargin.toFixed(2)}%</p>
+                        </div>
+                    `;
+                }
+
+                detailsHTML += `</div></div></td>`;
+                detailsRow.innerHTML = detailsHTML;
+                tableBody.appendChild(detailsRow);
+            }
+        };
+
+        const generateMatrixTable = () => {
+            const table = document.getElementById('matrixTable');
+            table.innerHTML = '';
+            
+            const costKeys = Object.keys(costNames);
+            const headerHtml = `
+                <thead>
+                    <tr class="bg-gray-50">
+                        <th class="p-3 font-semibold text-sm rounded-tl-lg">Producto</th>
+                        <th class="p-3 font-semibold text-sm">PAX</th>
+                        ${costKeys.map(key => `<th class="p-3 font-semibold text-sm">${costNames[key]}</th>`).join('')}
+                        <th class="p-3 font-semibold text-sm">Costo Total</th>
+                        <th class="p-3 font-semibold text-sm">Facturación</th>
+                        <th class="p-3 font-semibold text-sm">Ganancia</th>
+                        <th class="p-3 font-semibold text-sm rounded-tr-lg">% Margen Bruto</th>
+                    </tr>
+                </thead>
+            `;
+            
+            let bodyHtml = `<tbody>`;
+            const allProducts = Object.keys(allProductsData).sort();
+            
+            let totalPax = 0;
+            let totalCosts = {};
+            costKeys.forEach(key => totalCosts[key] = 0);
+            let totalTotalCost = 0;
+            let totalRevenue = 0;
+            let totalProfit = 0;
+
+            allProducts.forEach(productCode => {
+                const product = allProductsData[productCode];
+                const revenue = revenues[productCode];
+                const totalCost = Object.values(product.costos).reduce((sum, val) => sum + val, 0);
+                const profit = revenue - totalCost;
+                const margin = (profit / revenue) * 100;
+
+                totalPax += product.pax;
+                costKeys.forEach(key => totalCosts[key] += product.costos[key]);
+                totalTotalCost += totalCost;
+                totalRevenue += revenue;
+                totalProfit += profit;
+                
+                const profitClass = profit >= 0 ? 'positive-profit' : 'negative-profit';
+                
+                bodyHtml += `<tr class="bg-white shadow-sm hover:bg-gray-50 transition-colors duration-200">
+                    <td class="p-3 font-medium rounded-l-lg">${productCode}</td>
+                    <td class="p-3">${product.pax}</td>
+                    ${costKeys.map(key => `<td class="p-3">${formatNumber(product.costos[key])}</td>`).join('')}
+                    <td class="p-3 font-semibold">${formatNumber(totalCost)}</td>
+                    <td class="p-3">${formatNumber(revenue)}</td>
+                    <td class="p-3 font-semibold ${profitClass}">${formatNumber(profit)}</td>
+                    <td class="p-3 rounded-r-lg">${margin.toFixed(2)}%</td>
+                </tr>`;
+            });
+            bodyHtml += `</tbody>`;
+
+            const totalProfitClass = totalProfit >= 0 ? 'positive-profit' : 'negative-profit';
+
+            const footerHtml = `
+                <tfoot>
+                    <tr class="bg-gray-100 font-bold">
+                        <td class="p-3 rounded-bl-lg">TOTALES</td>
+                        <td class="p-3">${totalPax}</td>
+                        ${costKeys.map(key => `<td class="p-3">${formatNumber(totalCosts[key])}</td>`).join('')}
+                        <td class="p-3">${formatNumber(totalTotalCost)}</td>
+                        <td class="p-3">${formatNumber(totalRevenue)}</td>
+                        <td class="p-3 ${totalProfitClass}">${formatNumber(totalProfit)}</td>
+                        <td class="p-3 rounded-br-lg">${(totalProfit / totalRevenue * 100).toFixed(2)}%</td>
+                    </tr>
+                </tfoot>
+            `;
+            
+            table.innerHTML = headerHtml + bodyHtml + footerHtml;
+        };
+
+        const convertCurrency = (toUSD) => {
+            const factor = toUSD ? (1 / exchangeRate) : exchangeRate;
+            
+            for (const product in allProductsData) {
+                for (const cost in allProductsData[product].costos) {
+                    allProductsData[product].costos[cost] *= factor;
+                }
+            }
+            
+            for (const product in revenues) {
+                revenues[product] *= factor;
+            }
+
+            for (const item in fixedCostsBreakdown) {
+                fixedCostsBreakdown[item] *= factor;
+            }
+        };
+
+        const toggleCurrency = () => {
+            const isChecked = currencyToggle.checked;
+            currentCurrency = isChecked ? 'USD' : 'ARS';
+            currentCurrencyLabel.textContent = currentCurrency;
+
+            convertCurrency(isChecked);
+            
+            generateProductCheckboxes();
+            generateCostTable();
+            generateMatrixTable();
+        };
+
+        const setupEventListeners = () => {
+            sidebarItems.forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    sidebarItems.forEach(i => i.classList.remove('active'));
+                    item.classList.add('active');
+                    views.forEach(view => view.classList.remove('active'));
+                    const targetView = document.querySelector(item.getAttribute('href'));
+                    if (targetView) {
+                        targetView.classList.add('active');
+                    }
+                });
+            });
+
+            currencyToggle.addEventListener('change', toggleCurrency);
+        };
+
+        window.onload = () => {
+            setupEventListeners();
+            generateProductCheckboxes();
+            generateCostTable();
+            generateMatrixTable();
+        };
+    </script>
+</body>
+</html>
